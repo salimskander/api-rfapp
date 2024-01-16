@@ -2,17 +2,24 @@ from flask import Flask, jsonify, request
 from flask_pymongo import PyMongo
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 import os
 
 load_dotenv()  # Charge les variables d'environnement depuis le fichier .env
 
 app = Flask(__name__)
-
 app.config['MONGO_URI'] = os.getenv('MONGO_URI')    # Utilisez os.getenv pour accéder à la variable d'environnement
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')  # Clé secrète pour JWT
 mongo = PyMongo(app)
+jwt = JWTManager(app)
 
 if "ssl_ca_certs" in app.config['MONGO_URI']:
     mongo.cx._topology.options.ssl_ca_certs = app.config['MONGO_URI']["ssl_ca_certs"]
+
+# Gestion des erreurs 500 (Internal Server Error)
+@app.errorhandler(500)
+def internal_server_error(e):
+    return jsonify({'error': 'Erreur interne du serveur'}), 500
 
 @app.route('/')
 def index():
@@ -23,6 +30,10 @@ def index():
 def create_user():
     try:
         data = request.get_json()
+
+        # Vérifiez si le nom d'utilisateur ou le mot de passe est vide
+        if not data.get('username') or not data.get('password'):
+            return jsonify({'error': 'Le nom d\'utilisateur et le mot de passe sont requis'}), 400
 
         # Vérifiez si le nom d'utilisateur existe déjà
         if mongo.db.users.find_one({'username': data['username']}):
@@ -42,6 +53,38 @@ def create_user():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# Route pour authentifier un utilisateur et générer un token JWT
+@app.route('/api/auth', methods=['POST'])
+def authenticate_user():
+    try:
+        data = request.get_json()
+
+        # Vérifiez si le nom d'utilisateur et le mot de passe sont fournis
+        if not data.get('username') or not data.get('password'):
+            return jsonify({'error': 'Le nom d\'utilisateur et le mot de passe sont requis'}), 400
+
+        # Récupérez l'utilisateur depuis la base de données
+        user = mongo.db.users.find_one({'username': data['username']}, {'_id': 0})
+
+        # Vérifiez si l'utilisateur existe et si le mot de passe est correct
+        if user and check_password_hash(user['password'], data['password']):
+            # Générez un token JWT
+            access_token = create_access_token(identity=data['username'])
+            return jsonify(access_token=access_token), 200
+        else:
+            return jsonify({'error': 'Nom d\'utilisateur ou mot de passe incorrect'}), 401
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Exemple d'une route protégée par JWT
+@app.route('/api/protected', methods=['GET'])
+@jwt_required()
+def protected():
+    # Accédez à l'identité du courant utilisateur via get_jwt_identity
+    current_user = get_jwt_identity()
+    return jsonify(logged_in_as=current_user), 200
 
 # Route pour récupérer tous les utilisateurs
 @app.route('/api/user', methods=['GET'])
