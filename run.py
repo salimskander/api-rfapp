@@ -1,19 +1,22 @@
-from flask import Flask
 from dotenv import load_dotenv
-from flask_pymongo import PyMongo
-from flask_jwt_extended import JWTManager
-import os
+from flask import Flask
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
+from dotenv import load_dotenv
+from config import app
+import sys, os
 
 load_dotenv()
+uri = os.getenv('MONGO_URI')
 
-app = Flask(__name__)
-app.config['MONGO_URI'] = os.getenv('MONGO_URI')
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
-mongo = PyMongo(app)
-jwt = JWTManager(app)
+client = MongoClient(uri, server_api=ServerApi('1'))
 
-if "ssl_ca_certs" in app.config['MONGO_URI']:
-    mongo.cx._topology.options.ssl_ca_certs = app.config['MONGO_URI']["ssl_ca_certs"]
+try:
+    client.admin.command('ping')
+    print("Pinged your deployment. You successfully connected to MongoDB!")
+except Exception as e:
+    print(e)
+    sys.exit()
 
 if __name__ == '__main__':
     app.run(debug=True)
