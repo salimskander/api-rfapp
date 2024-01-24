@@ -19,20 +19,19 @@ def register():
 
         if PyMongo(current_app).db.users.find_one({'username': data['username']}):
             return jsonify({'error': 'Ce nom d\'utilisateur existe déjà'}), 400
-
+        
         hashed_password = generate_password_hash(data['password'], method='pbkdf2')
 
         new_user = User(username, hashed_password)
 
         user_data = {
             'username': new_user.username,
-            'password_hash': new_user.password,
+            'password': new_user.password,
         }
         
         PyMongo(current_app).db.users.insert_one(user_data)
 
-        return jsonify({'message': 'Utilisateur créé avec succès'}), 201
-
+        return jsonify({'message': 'User created successfully'}), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     

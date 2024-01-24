@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from models.User import User
 from flask_pymongo import PyMongo
 from flask import current_app
-from werkzeug.security import generate_password_hash
+from flask_jwt_extended import jwt_required
 
 user_routes = Blueprint('user_routes', __name__, url_prefix='/api/users')
 
@@ -17,6 +17,7 @@ def get_users():
         return jsonify({'error': str(e)}), 500
     
 @user_routes.route('/<username>', methods=['GET'])
+@jwt_required()
 def get_user(username):
     try:
         user = PyMongo(current_app).db.users.find_one({'username': username }, {'_id': 0 })
@@ -29,6 +30,7 @@ def get_user(username):
         return jsonify({'error': str(e)}), 500
     
 @user_routes.route('/<username>', methods=['PATCH'])
+@jwt_required()
 def update_user(username):
     try:
         data = request.get_json()
@@ -45,6 +47,7 @@ def update_user(username):
         return jsonify({'error': str(e)}), 500
 
 @user_routes.route('/<username>', methods=['DELETE'])
+@jwt_required()
 def delete_user(username):
     try:
         result = PyMongo(current_app).db.users.delete_one({'username': username})
